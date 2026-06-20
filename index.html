@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시험 감독 배치 프로그램 🏫</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window._sbLoaded = true;</script>
+<style>
+:root {
+  --primary:#1a56db;--primary-light:#e8f0fe;--primary-dark:#1341a8;
+  --success:#0e7f4f;--success-light:#e6f7ef;
+  --warning:#b45309;--warning-light:#fef3cd;
+  --danger:#b91c1c;--danger-light:#fee2e2;
+  --pink-light:#fce7f3;--pink:#9d174d;
+  --bg:#f5f7fa;--surface:#fff;--surface2:#f0f2f5;
+  --border:#d1d5db;--border-light:#e5e7eb;
+  --text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+
+/* ── 연결 설정 화면 ── */
+#setup-screen{display:none}
+.setup-box{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border-light);padding:32px;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.setup-logo{font-size:28px;margin-bottom:6px}
+.setup-title{font-size:20px;font-weight:800;margin-bottom:4px}
+.setup-sub{font-size:13px;color:var(--text2);margin-bottom:24px}
+.setup-step{display:flex;gap:10px;align-items:flex-start;margin-bottom:14px;font-size:13px}
+.setup-step-num{width:22px;height:22px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.setup-field{margin-bottom:12px}
+.setup-field label{font-size:12px;font-weight:700;color:var(--text2);display:block;margin-bottom:5px}
+.setup-field input{width:100%;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:inherit}
+.setup-field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,86,219,.12)}
+.setup-link{font-size:12px;color:var(--primary);text-decoration:none}
+.setup-link:hover{text-decoration:underline}
+#setup-error{font-size:12px;color:var(--danger);margin-top:8px;display:none}
+
+/* ── 앱 헤더 ── */
+.app-header{background:var(--surface);border-bottom:1px solid var(--border-light);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+.app-header h1{font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block}
+.sync-status{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;display:flex;align-items:center;gap:5px}
+.sync-ok{background:var(--success-light);color:var(--success)}
+.sync-saving{background:var(--warning-light);color:var(--warning)}
+.sync-err{background:var(--danger-light);color:var(--danger)}
+.header-actions{display:flex;gap:8px;align-items:center}
+
+/* ── 레이아웃 ── */
+.layout{display:flex;min-height:calc(100vh - 56px)}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border-light);padding:16px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:4px}
+.sidebar-section{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;padding:8px 8px 4px;margin-top:8px}
+.sidebar-section:first-child{margin-top:0}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:600;transition:background .12s,color .12s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--bg);color:var(--text)}
+.nav-item.active{background:var(--primary-light);color:var(--primary)}
+.nav-item .icon{font-size:16px;width:20px;text-align:center}
+.nav-badge{margin-left:auto;font-size:11px;background:var(--primary);color:#fff;padding:1px 7px;border-radius:999px;font-weight:700}
+.main{flex:1;padding:24px;overflow-y:auto}
+.page{display:none}
+.page.active{display:block}
+
+/* ── 카드 ── */
+.card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.card-title{font-size:15px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+
+/* ── 공통 폼 ── */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.settings-grid{grid-template-columns:1fr}}
+.field-group{margin-bottom:14px}
+.field-label{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px}
+.field-row{display:flex;align-items:center;gap:8px}
+.field-desc{font-size:11px;color:var(--text3);margin-top:4px}
+input[type="number"],input[type="text"],select,textarea{font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:inherit;transition:border-color .15s}
+input[type="number"]:focus,input[type="text"]:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,86,219,.12)}
+input[type="number"]{width:80px;text-align:center}
+
+/* ── 버튼 ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .12s;font-family:inherit}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-secondary{background:var(--surface);color:var(--text2);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--bg)}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger-light);color:var(--danger);border:1px solid #fca5a5}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ── 감독 명단 ── */
+.teacher-input-row{display:flex;gap:8px;margin-bottom:10px}
+.teacher-input-row input{flex:1}
+.teacher-tags{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light)}
+.teacher-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 6px 3px 10px;background:var(--surface);border:1px solid var(--border);border-radius:999px;font-size:12px;font-weight:600}
+.teacher-tag .rm{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;line-height:1;padding:0 2px;border-radius:999px}
+.teacher-tag .rm:hover{background:var(--danger-light);color:var(--danger)}
+
+/* ── 배치 테이블 ── */
+.grade-header{font-size:13px;font-weight:800;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px}
+.assign-table{width:100%;border-collapse:collapse}
+.assign-table th{font-size:11px;font-weight:700;color:var(--text2);padding:7px 10px;background:var(--bg);border:1px solid var(--border-light);text-align:center;white-space:nowrap}
+.assign-table td{padding:5px 8px;border:1px solid var(--border-light);vertical-align:middle}
+.assign-table td:first-child{font-size:12px;font-weight:700;color:var(--text2);text-align:center;white-space:nowrap;background:var(--bg)}
+.assign-table select{width:100%;min-width:100px;font-size:12px;padding:5px 6px}
+.hall-wait-row{display:flex;gap:12px;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light);align-items:center;flex-wrap:wrap;margin-top:8px}
+.hall-item{display:flex;align-items:center;gap:6px}
+.hall-item label{font-size:12px;font-weight:700;color:var(--text2)}
+.hall-item select{min-width:120px;font-size:12px}
+
+/* ── 결과표 ── */
+.result-wrapper{overflow-x:auto}
+.result-table{width:100%;border-collapse:collapse;font-size:12px}
+.result-table th{background:var(--primary);color:#fff;font-size:11px;font-weight:700;padding:9px 10px;border:1px solid var(--primary-dark);text-align:center;white-space:nowrap}
+.result-table td{padding:7px 10px;border:1px solid var(--border-light);text-align:center;vertical-align:middle}
+.result-table tr:nth-child(even) td{background:#fafbfc}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.badge-main{background:var(--primary-light);color:var(--primary)}
+.badge-sub{background:var(--success-light);color:var(--success)}
+.badge-hall{background:var(--warning-light);color:var(--warning)}
+.badge-wait{background:var(--pink-light);color:var(--pink)}
+.badge-empty{background:var(--bg);color:var(--text3)}
+
+/* ── 알림 ── */
+.alert{padding:10px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
+.alert-warning{background:var(--warning-light);color:var(--warning);border:1px solid #fcd34d}
+.alert-info{background:var(--primary-light);color:var(--primary);border:1px solid #93c5fd}
+.alert-success{background:var(--success-light);color:var(--success);border:1px solid #6ee7b7}
+.alert-danger{background:var(--danger-light);color:var(--danger);border:1px solid #fca5a5}
+.hidden{display:none}
+
+/* ── 통계 ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:12px 14px}
+.stat-label{font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px}
+.stat-value{font-size:22px;font-weight:800;color:var(--text);line-height:1}
+.stat-unit{font-size:12px;color:var(--text2);font-weight:600}
+
+/* ── 인쇄 ── */
+@media print{
+  body{background:#fff;font-size:11px}
+  #setup-screen,.app-header,.sidebar,.header-actions,.no-print{display:none}
+  .main{padding:0}
+  .layout{display:block}
+  .card{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid}
+  .result-table th{background:#333!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<!-- DB 자동연결 버전 -->
+<!-- ══ 앱 본체 ══ -->
+<header class="app-header">
+  <h1><span class="dot"></span> 시험 감독 배치</h1>
+  <div class="header-actions no-print">
+    <div class="sync-status sync-ok" id="sync-status">● 연결됨</div>
+    <button class="btn btn-secondary btn-sm" onclick="manualSync()">🔄 동기화</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportData()">💾 백업</button>
+    <button class="btn btn-secondary btn-sm" onclick="importData()">📂 복원</button>
+    <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ 인쇄</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="doImport(event)">
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar no-print">
+    <div class="sidebar-section">기본 설정</div>
+    <button class="nav-item active" onclick="showPage('settings',this)"><span class="icon">⚙️</span> 환경 설정</button>
+    <button class="nav-item" onclick="showPage('teachers',this)"><span class="icon">👨‍🏫</span> 감독 명단 <span class="nav-badge" id="teacher-badge">0</span></button>
+    <button class="nav-item" onclick="showPage('constraints',this)"><span class="icon">🔒</span> 배치 제약</button>
+
+    <div class="sidebar-section">교시별 배치</div>
+    <button class="nav-item" id="nav-p1" onclick="showPage('period1',this)"><span class="icon">📝</span> 1교시</button>
+    <button class="nav-item" id="nav-p2" onclick="showPage('period2',this)"><span class="icon">📝</span> 2교시</button>
+    <button class="nav-item" id="nav-p3" onclick="showPage('period3',this)"><span class="icon">📝</span> 3교시</button>
+
+    <div class="sidebar-section">결과</div>
+    <button class="nav-item" onclick="showPage('result',this)"><span class="icon">📋</span> 배치표</button>
+    <button class="nav-item" onclick="showPage('summary',this)"><span class="icon">📊</span> 담당 현황</button>
+
+  </nav>
+
+  <main class="main">
+
+    <!-- ① 환경 설정 -->
+    <div id="page-settings" class="page active">
+      <div class="card">
+        <div class="card-title">⚙️ 환경 설정</div>
+        <div class="alert alert-info">학교 환경에 맞게 설정하세요. 저장 즉시 DB에 반영됩니다.</div>
+        <div class="settings-grid">
+          <div>
+            <div class="field-group"><div class="field-label">학교 이름</div><input type="text" id="cfg-school" value="○○고등학교" style="width:100%"></div>
+            <div class="field-group"><div class="field-label">시험 이름</div><input type="text" id="cfg-exam" value="2024학년도 1학기 기말고사" style="width:100%"></div>
+            <div class="field-group"><div class="field-label">시험 날짜</div><input type="text" id="cfg-date" placeholder="예: 2024년 7월 1일~3일" style="width:100%"></div>
+          </div>
+          <div>
+            <div class="field-group"><div class="field-label">학년 수</div><div class="field-row"><input type="number" id="cfg-grades" value="3" min="1" max="6"> <span style="color:var(--text2)">학년</span></div></div>
+            <div class="field-group"><div class="field-label">학급 수 (학년당)</div><div class="field-row"><input type="number" id="cfg-classes" value="12" min="1" max="30"> <span style="color:var(--text2)">반</span></div></div>
+            <div class="field-group"><div class="field-label">교시 수</div><div class="field-row"><input type="number" id="cfg-periods" value="3" min="1" max="8"> <span style="color:var(--text2)">교시</span></div></div>
+          </div>
+          <div>
+            <div class="field-group"><div class="field-label">각 반 감독 수</div><div class="field-row"><input type="number" id="cfg-per-room" value="2" min="1" max="5"> <span style="color:var(--text2)">명</span></div><div class="field-desc">2명 = 정감독 1 + 부감독 1</div></div>
+            <div class="field-group"><div class="field-label">복도감독 (학년당)</div><div class="field-row"><input type="number" id="cfg-hall" value="1" min="0" max="10"> <span style="color:var(--text2)">명</span></div></div>
+            <div class="field-group"><div class="field-label">대기실 감독</div><div class="field-row"><input type="number" id="cfg-wait" value="1" min="0" max="10"> <span style="color:var(--text2)">명</span></div></div>
+          </div>
+          <div>
+            <div class="field-group"><div class="field-label">교시별 시간</div><div id="period-times"></div></div>
+          </div>
+        </div>
+        <div style="margin-top:8px;padding-top:14px;border-top:1px solid var(--border-light);">
+          <div class="field-label" style="margin-bottom:8px;">교과목 입력 방식</div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="radio" name="subjectMode" value="period" id="mode-period" onchange="onSubjectModeChange()"> 교시별 단일 과목</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="radio" name="subjectMode" value="class" id="mode-class" onchange="onSubjectModeChange()"> 반별 개별 과목</label>
+          </div>
+          <div id="subject-inputs"></div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="saveSettings()">✅ 저장</button>
+          <button class="btn btn-secondary" onclick="resetSettings()">↩️ 초기화</button>
+        </div>
+        <div id="settings-saved" class="alert alert-success hidden" style="margin-top:12px;margin-bottom:0">저장되었습니다.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 교시당 필요 인원</div>
+        <div class="stat-grid" id="need-stat-grid"></div>
+      </div>
+    </div>
+
+    <!-- ② 감독 명단 -->
+    <div id="page-teachers" class="page">
+      <div class="card">
+        <div class="card-title">👨‍🏫 감독 선생님 명단</div>
+        <div class="teacher-input-row">
+          <input type="text" id="t-name" placeholder="이름 입력 후 엔터" style="flex:1" onkeydown="if(event.key==='Enter'){addTeacher();event.preventDefault();}">
+          <button class="btn btn-primary" onclick="addTeacher()">+ 추가</button>
+          <button class="btn btn-secondary" onclick="clearAllTeachers()">🗑️ 전체 삭제</button>
+        </div>
+        <div class="teacher-tags" id="teacher-tags"></div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px;" id="teacher-count-label">0명</div>
+        <div id="teacher-need-alert" class="alert alert-warning hidden" style="margin-top:10px;margin-bottom:0"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 일괄 입력</div>
+        <div style="color:var(--text2);font-size:12px;margin-bottom:8px;">쉼표(,) 또는 줄바꿈으로 구분해 한꺼번에 입력</div>
+        <textarea id="bulk-textarea" rows="5" style="width:100%" placeholder="홍길동, 김철수, 이영희"></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="doBulkInput()">추가</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('bulk-textarea').value=''">지우기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 제약 조건 -->
+    <div id="page-constraints" class="page">
+      <div class="card">
+        <div class="card-title">🔒 배치 제약 조건</div>
+        <div class="alert alert-info">자동 배치 시 적용되며, 수동 배치 시 위반 여부를 배치표에서 알려줍니다.</div>
+
+        <div style="margin-bottom:20px;padding:16px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light)">
+          <div style="font-size:14px;font-weight:800;margin-bottom:12px;">📌 제약 1 — 교시 간 중복 배치</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;"><input type="radio" name="dupMode" value="none" id="dup-none" onchange="saveCfgConstraints()"> <span><b>제약 없음</b> — 같은 선생님이 여러 교시 중복 배치 가능</span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;"><input type="radio" name="dupMode" value="max" id="dup-max" onchange="saveCfgConstraints()"> <span><b>하루 최대 횟수 제한</b> — 1인당 <input type="number" id="max-duties" value="2" min="1" max="8" style="width:52px;display:inline-block;padding:3px 6px;margin:0 4px;" onchange="saveCfgConstraints()"> 회 이하</span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;"><input type="radio" name="dupMode" value="nodup" id="dup-nodup" onchange="saveCfgConstraints()"> <span><b>교시 간 중복 완전 금지</b> — 하루 한 번만 배치</span></label>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;padding:16px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light)">
+          <div style="font-size:14px;font-weight:800;margin-bottom:8px;">🚫 제약 2 — 특정 교시 제외 (개인 사정)</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">특정 선생님을 특정 교시에서 제외합니다.</div>
+          <div id="exclude-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addExcludeRow()">+ 제외 조건 추가</button>
+        </div>
+
+        <div style="padding:16px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light)">
+          <div style="font-size:14px;font-weight:800;margin-bottom:8px;">🏫 제약 3 — 담임 자기 반 감독 금지</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:10px;">
+            <input type="checkbox" id="no-homeroom" onchange="saveCfgConstraints();toggleHomeroomTable()">
+            담임 선생님은 자기 반 정·부감독 배치 금지
+          </label>
+          <div id="homeroom-table" style="display:none">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:8px">담임 반 지정</div>
+            <div id="homeroom-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px"></div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="renderHomeroomList()">🔄 명단 새로고침</button>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="saveCfgConstraints();showToast('제약 조건 저장됨')">✅ 저장</button>
+          <button class="btn btn-secondary" onclick="resetConstraints()">↩️ 초기화</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ 교시별 배치 -->
+    <div id="page-period1" class="page"></div>
+    <div id="page-period2" class="page"></div>
+    <div id="page-period3" class="page"></div>
+
+    <!-- ⑤ 배치표 -->
+    <div id="page-result" class="page">
+      <div class="card no-print">
+        <div class="card-title">📋 시험 감독 배치표</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <button class="btn btn-primary" onclick="renderResult()">🔄 새로고침</button>
+          <button class="btn btn-success" onclick="window.print()">🖨️ 인쇄</button>
+          <button class="btn btn-secondary" onclick="copyResultText()">📄 텍스트 복사</button>
+        </div>
+        <div id="dup-alerts"></div>
+      </div>
+      <div id="result-content"></div>
+    </div>
+
+    <!-- ⑥ 담당 현황 -->
+    <div id="page-summary" class="page">
+      <div class="card">
+        <div class="card-title">📊 선생님별 담당 현황</div>
+        <button class="btn btn-primary no-print" onclick="renderSummary()" style="margin-bottom:12px">🔄 새로고침</button>
+        <div id="summary-content"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- 토스트 -->
+<div id="toast" style="position:fixed;bottom:24px;right:24px;background:#111827;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:none;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>
+
+<script>
+// ═══════════════════════════════════════
+//  Supabase 초기화
+// ═══════════════════════════════════════
+let supabase = null;
+let isLocalMode = false;
+let syncTimer = null;
+
+async function connectSupabase() {
+  const SB_URL = 'https://sfuneylnxxcnqrkbhavv.supabase.co';
+  const SB_KEY = 'sb_publishable_tpwE_SHXSCF0FwCm4G248Q_r690c4vH';
+  try {
+    if (!window.supabase || !window.supabase.createClient) throw new Error('supabase 라이브러리 미로드');
+    supabase = window.supabase.createClient(SB_URL, SB_KEY);
+    const { data, error } = await supabase.from('supervision_data').select('key').limit(1);
+    if (error) throw error;
+    setSyncStatus('ok', '● DB 연결됨');
+    await loadAllFromDB();
+  } catch(e) {
+    console.warn('Supabase 연결 실패, 로컬모드로 전환:', e.message);
+    setSyncStatus('saving', '💻 로컬 모드');
+    supabase = null;
+    isLocalMode = true;
+    loadFromLocal();
+  }
+}
+
+function useLocalMode() {
+  isLocalMode = true;
+  supabase = null;
+  document.getElementById('setup-screen').style.display = 'none';
+  setSyncStatus('saving', '💻 로컬 모드');
+  loadFromLocal();
+}
+
+function reconnect() {
+  document.getElementById('setup-screen').style.display = 'flex';
+  const url = localStorage.getItem('sb_url') || '';
+  const key = localStorage.getItem('sb_key') || '';
+  document.getElementById('sb-url').value = url;
+  document.getElementById('sb-key').value = key;
+}
+
+function showSetupError(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function setSyncStatus(type, text) {
+  const el = document.getElementById('sync-status');
+  el.className = 'sync-status sync-' + (type === 'ok' ? 'ok' : type === 'err' ? 'err' : 'saving');
+  el.textContent = text;
+}
+
+// ═══════════════════════════════════════
+//  DB 읽기 / 쓰기
+// ═══════════════════════════════════════
+async function dbSet(key, value) {
+  if (isLocalMode || !supabase) {
+    localStorage.setItem('exam_' + key, JSON.stringify(value));
+    return;
+  }
+  setSyncStatus('saving', '↑ 저장 중...');
+  try {
+    const { error } = await supabase.from('supervision_data').upsert({ key, value, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    setSyncStatus('ok', '● 저장됨');
+  } catch(e) {
+    setSyncStatus('err', '⚠ 저장 실패');
+    localStorage.setItem('exam_' + key, JSON.stringify(value)); // 로컬 fallback
+  }
+}
+
+async function dbGet(key) {
+  if (isLocalMode || !supabase) {
+    const v = localStorage.getItem('exam_' + key);
+    return v ? JSON.parse(v) : null;
+  }
+  try {
+    const { data, error } = await supabase.from('supervision_data').select('value').eq('key', key).single();
+    if (error || !data) return null;
+    return data.value;
+  } catch { return null; }
+}
+
+async function loadAllFromDB() {
+  setSyncStatus('saving', '↓ 불러오는 중...');
+  try {
+    const { data, error } = await supabase.from('supervision_data').select('key,value');
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach(r => map[r.key] = r.value);
+    if (map.cfg) { cfg = { ...cfg, ...map.cfg }; if(!cfg.constraints) cfg.constraints = defaultConstraints(); }
+    if (map.teachers) teachers = map.teachers;
+    if (map.assignments) assignments = map.assignments;
+    else initAssignments();
+    setSyncStatus('ok', '● DB 연결됨');
+  } catch(e) {
+    setSyncStatus('err', '⚠ 불러오기 실패');
+    loadFromLocal();
+  }
+  applySettingsToUI();
+  renderTeachers();
+  updateNeedSummary();
+}
+
+function loadFromLocal() {
+  const c = localStorage.getItem('exam_cfg');
+  const t = localStorage.getItem('exam_teachers');
+  const a = localStorage.getItem('exam_assignments');
+  if (c) { cfg = { ...cfg, ...JSON.parse(c) }; if(!cfg.constraints) cfg.constraints = defaultConstraints(); }
+  if (t) teachers = JSON.parse(t);
+  if (a) assignments = JSON.parse(a);
+  else initAssignments();
+  applySettingsToUI();
+  renderTeachers();
+  updateNeedSummary();
+}
+
+async function autoSave() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    await dbSet('cfg', cfg);
+    await dbSet('teachers', teachers);
+    await dbSet('assignments', assignments);
+  }, 600);
+}
+
+async function manualSync() {
+  setSyncStatus('saving', '↓ 동기화 중...');
+  if (!isLocalMode && supabase) {
+    await loadAllFromDB();
+    // 현재 화면 재렌더
+    const active = document.querySelector('.page.active');
+    if (active) {
+      const id = active.id;
+      if (id === 'page-period1') renderPeriodPage(1);
+      if (id === 'page-period2') renderPeriodPage(2);
+      if (id === 'page-period3') renderPeriodPage(3);
+      if (id === 'page-result') renderResult();
+      if (id === 'page-summary') renderSummary();
+    }
+    showToast('최신 데이터로 동기화 완료');
+  } else {
+    showToast('로컬 모드 — DB 없음');
+    setSyncStatus('saving', '💻 로컬 모드');
+  }
+}
+
+// ═══════════════════════════════════════
+//  상태
+// ═══════════════════════════════════════
+let cfg = {
+  school:'○○고등학교', exam:'2024학년도 1학기 기말고사', date:'',
+  grades:3, classes:12, periods:3, perRoom:2, hall:1, wait:1,
+  times:['09:00~10:00','10:20~11:20','11:40~12:40'],
+  subjectMode:'period', subjects:{},
+  constraints: null
+};
+let teachers = [];
+let assignments = {};
+
+function defaultConstraints() {
+  return { dupMode:'none', maxDuties:2, excludes:[], noHomeroom:false, homeroom:{} };
+}
+
+function initAssignments() {
+  assignments = {};
+  for (let p = 1; p <= cfg.periods; p++) {
+    assignments[p] = { rooms:{}, hall:{}, wait:[] };
+    for (let g = 1; g <= cfg.grades; g++) {
+      assignments[p].hall[g] = Array(cfg.hall).fill('');
+      for (let c = 1; c <= cfg.classes; c++) assignments[p].rooms[`${g}-${c}`] = Array(cfg.perRoom).fill('');
+    }
+    assignments[p].wait = Array(cfg.wait).fill('');
+  }
+}
+
+// ═══════════════════════════════════════
+//  초기 로드
+// ═══════════════════════════════════════
+function initApp() {
+  try {
+    if (!cfg.constraints) cfg.constraints = defaultConstraints();
+    initAssignments();
+    // 모든 페이지 강제로 숨기기
+    ['page-settings','page-teachers','page-constraints','page-period1','page-period2','page-period3','page-result','page-summary'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.cssText = 'display:none'; el.classList.remove('active'); }
+    });
+    // 첫 페이지만 보이기
+    const firstPage = document.getElementById('page-settings');
+    if (firstPage) { firstPage.style.cssText = 'display:block'; firstPage.classList.add('active'); }
+    applySettingsToUI();
+    renderTeachers();
+    updateNeedSummary();
+    connectSupabase();
+  } catch(e) {
+    console.error('앱 초기화 오류:', e);
+    alert('초기화 오류: ' + e.message);
+  }
+}
+window.onload = initApp;
+
+// ═══════════════════════════════════════
+//  페이지 전환
+// ═══════════════════════════════════════
+function showPage(name, btn) {
+  try {
+    const allPages = ['page-settings','page-teachers','page-constraints','page-period1','page-period2','page-period3','page-result','page-summary'];
+    allPages.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.cssText = 'display:none'; el.classList.remove('active'); }
+    });
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    const target = document.getElementById('page-' + name);
+    if (!target) { alert('페이지를 찾을 수 없습니다: ' + name); return; }
+    target.style.cssText = 'display:block';
+    target.classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (name === 'period1') renderPeriodPage(1);
+    if (name === 'period2') renderPeriodPage(2);
+    if (name === 'period3') renderPeriodPage(3);
+    if (name === 'result') renderResult();
+    if (name === 'summary') renderSummary();
+    if (name === 'constraints') { applyConstraintsToUI(); renderHomeroomList(); }
+  } catch(e) { alert('메뉴 오류: ' + e.message); }
+}
+
+// ═══════════════════════════════════════
+//  환경 설정
+// ═══════════════════════════════════════
+function renderPeriodTimes() {
+  const c = document.getElementById('period-times');
+  if (!c) return;
+  let html = '';
+  for (let p = 1; p <= cfg.periods; p++) {
+    const val = cfg.times[p-1] || '';
+    html += `<div class="field-row" style="margin-bottom:6px;"><span style="font-size:12px;color:var(--text2);min-width:46px;">${p}교시</span><input type="text" id="cfg-time-${p}" value="${val}" placeholder="09:00~10:00" style="flex:1;"></div>`;
+  }
+  c.innerHTML = html;
+}
+
+function applySettingsToUI() {
+  document.getElementById('cfg-school').value = cfg.school;
+  document.getElementById('cfg-exam').value = cfg.exam;
+  document.getElementById('cfg-date').value = cfg.date || '';
+  document.getElementById('cfg-grades').value = cfg.grades;
+  document.getElementById('cfg-classes').value = cfg.classes;
+  document.getElementById('cfg-periods').value = cfg.periods;
+  document.getElementById('cfg-per-room').value = cfg.perRoom;
+  document.getElementById('cfg-hall').value = cfg.hall;
+  document.getElementById('cfg-wait').value = cfg.wait;
+  renderPeriodTimes();
+  renderSubjectInputs();
+  applyConstraintsToUI();
+  updateSidebarPeriods();
+}
+
+function updateSidebarPeriods() {
+  for (let p = 1; p <= 8; p++) {
+    const el = document.getElementById('nav-p' + p);
+    if (!el) continue;
+    el.style.display = p <= cfg.periods ? '' : 'none';
+  }
+}
+
+async function saveSettings() {
+  cfg.school = document.getElementById('cfg-school').value.trim() || '○○고등학교';
+  cfg.exam = document.getElementById('cfg-exam').value.trim();
+  cfg.date = document.getElementById('cfg-date').value.trim();
+  cfg.grades = parseInt(document.getElementById('cfg-grades').value) || 3;
+  cfg.classes = parseInt(document.getElementById('cfg-classes').value) || 12;
+  cfg.periods = parseInt(document.getElementById('cfg-periods').value) || 3;
+  cfg.perRoom = parseInt(document.getElementById('cfg-per-room').value) || 2;
+  cfg.hall = parseInt(document.getElementById('cfg-hall').value) || 1;
+  cfg.wait = parseInt(document.getElementById('cfg-wait').value) || 1;
+  cfg.times = [];
+  for (let p = 1; p <= cfg.periods; p++) { const el = document.getElementById(`cfg-time-${p}`); cfg.times.push(el ? el.value.trim() : ''); }
+  cfg.subjectMode = document.querySelector('input[name="subjectMode"]:checked')?.value || 'period';
+  liveSubjectSave();
+  const prev = JSON.parse(JSON.stringify(assignments));
+  initAssignments();
+  for (let p = 1; p <= cfg.periods; p++) {
+    if (!prev[p]) continue;
+    for (let g = 1; g <= cfg.grades; g++) {
+      if (prev[p].hall?.[g]) assignments[p].hall[g] = prev[p].hall[g].slice(0,cfg.hall).concat(Array(Math.max(0,cfg.hall-prev[p].hall[g].length)).fill(''));
+      for (let c = 1; c <= cfg.classes; c++) { const k=`${g}-${c}`; if (prev[p].rooms?.[k]) assignments[p].rooms[k]=prev[p].rooms[k].slice(0,cfg.perRoom).concat(Array(Math.max(0,cfg.perRoom-prev[p].rooms[k].length)).fill('')); }
+    }
+    if (prev[p].wait) assignments[p].wait = prev[p].wait.slice(0,cfg.wait).concat(Array(Math.max(0,cfg.wait-prev[p].wait.length)).fill(''));
+  }
+  updateNeedSummary(); renderPeriodTimes(); renderSubjectInputs(); updateSidebarPeriods();
+  await autoSave();
+  showToast('설정 저장됨');
+}
+
+async function resetSettings() {
+  if (!confirm('설정을 초기값으로 되돌리겠습니까?')) return;
+  cfg = { school:'○○고등학교', exam:'2024학년도 1학기 기말고사', date:'', grades:3, classes:12, periods:3, perRoom:2, hall:1, wait:1, times:['09:00~10:00','10:20~11:20','11:40~12:40'], subjectMode:'period', subjects:{}, constraints:defaultConstraints() };
+  applySettingsToUI(); initAssignments(); updateNeedSummary(); await autoSave();
+}
+
+function updateNeedSummary() {
+  const roomTotal = cfg.grades * cfg.classes * cfg.perRoom;
+  const hallTotal = cfg.grades * cfg.hall;
+  const waitTotal = cfg.wait;
+  const total = roomTotal + hallTotal + waitTotal;
+  const grid = document.getElementById('need-stat-grid');
+  if (!grid) return;
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">각 반 감독</div><div class="stat-value">${roomTotal}<span class="stat-unit">명</span></div><div style="font-size:11px;color:var(--text3);margin-top:4px">${cfg.grades}학년 × ${cfg.classes}반 × ${cfg.perRoom}명</div></div>
+    <div class="stat-card"><div class="stat-label">복도 감독</div><div class="stat-value">${hallTotal}<span class="stat-unit">명</span></div></div>
+    <div class="stat-card"><div class="stat-label">대기실 감독</div><div class="stat-value">${waitTotal}<span class="stat-unit">명</span></div></div>
+    <div class="stat-card" style="border-color:var(--primary)"><div class="stat-label">교시당 합계</div><div class="stat-value" style="color:var(--primary)">${total}<span class="stat-unit">명</span></div></div>
+    <div class="stat-card"><div class="stat-label">${cfg.periods}교시 총계</div><div class="stat-value">${total*cfg.periods}<span class="stat-unit">명</span></div><div style="font-size:11px;color:var(--text3);margin-top:4px">(교시간 중복 허용 시)</div></div>`;
+}
+
+// ═══════════════════════════════════════
+//  교과목
+// ═══════════════════════════════════════
+function renderSubjectInputs() {
+  const wrap = document.getElementById('subject-inputs');
+  if (!wrap) return;
+  const mode = cfg.subjectMode || 'period';
+  const mpEl = document.getElementById('mode-period');
+  const mcEl = document.getElementById('mode-class');
+  if (mpEl) mpEl.checked = (mode === 'period');
+  if (mcEl) mcEl.checked = (mode === 'class');
+  if (mode === 'period') {
+    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">';
+    for (let p = 1; p <= cfg.periods; p++) {
+      const val = (cfg.subjects && cfg.subjects[p]) || '';
+      html += `<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12px;font-weight:700;color:var(--text2);min-width:46px;">${p}교시</span><input type="text" id="subj-p-${p}" value="${val}" placeholder="예: 국어" style="flex:1;" oninput="liveSubjectSave()"></div>`;
+    }
+    html += '</div>';
+    wrap.innerHTML = html;
+  } else {
+    let html = '';
+    for (let p = 1; p <= cfg.periods; p++) {
+      html += `<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:800;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);">${p}교시</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;">`;
+      for (let g = 1; g <= cfg.grades; g++) {
+        for (let c = 1; c <= cfg.classes; c++) {
+          const key = `${g}-${c}`;
+          const val = (cfg.subjects?.[p] && typeof cfg.subjects[p]==='object') ? (cfg.subjects[p][key]||'') : '';
+          html += `<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:var(--text2);min-width:38px;">${g}-${c}반</span><input type="text" id="subj-c-${p}-${key}" value="${val}" placeholder="과목" style="flex:1;font-size:12px;padding:5px 7px;" oninput="liveSubjectSave()"></div>`;
+        }
+      }
+      html += '</div></div>';
+    }
+    wrap.innerHTML = html;
+  }
+}
+
+function liveSubjectSave() {
+  const mode = cfg.subjectMode || 'period';
+  cfg.subjects = {};
+  if (mode === 'period') {
+    for (let p = 1; p <= cfg.periods; p++) { const el = document.getElementById(`subj-p-${p}`); if(el) cfg.subjects[p]=el.value.trim(); }
+  } else {
+    for (let p = 1; p <= cfg.periods; p++) {
+      cfg.subjects[p] = {};
+      for (let g = 1; g <= cfg.grades; g++) for (let c = 1; c <= cfg.classes; c++) { const k=`${g}-${c}`; const el=document.getElementById(`subj-c-${p}-${k}`); if(el) cfg.subjects[p][k]=el.value.trim(); }
+    }
+  }
+}
+
+function onSubjectModeChange() {
+  const r = document.querySelector('input[name="subjectMode"]:checked');
+  if (r) cfg.subjectMode = r.value;
+  cfg.subjects = {};
+  renderSubjectInputs();
+}
+
+function getSubject(period, key) {
+  if (!cfg.subjects) return '';
+  if ((cfg.subjectMode||'period') === 'period') return cfg.subjects[period] || '';
+  return (cfg.subjects[period] && typeof cfg.subjects[period]==='object') ? (cfg.subjects[period][key]||'') : '';
+}
+
+// ═══════════════════════════════════════
+//  감독 명단
+// ═══════════════════════════════════════
+async function addTeacher() {
+  const inp = document.getElementById('t-name');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (teachers.includes(name)) { showToast(`'${name}'은 이미 추가됨`); inp.value=''; return; }
+  teachers.push(name);
+  inp.value = ''; inp.focus();
+  renderTeachers(); await autoSave();
+}
+
+async function removeTeacher(name) {
+  teachers = teachers.filter(t => t !== name);
+  renderTeachers(); await autoSave();
+}
+
+async function clearAllTeachers() {
+  if (!confirm('명단을 전체 삭제하겠습니까?')) return;
+  teachers = []; renderTeachers(); await autoSave();
+}
+
+async function doBulkInput() {
+  const raw = document.getElementById('bulk-textarea').value;
+  const names = raw.split(/[\n,，、]/).map(n=>n.trim()).filter(n=>n);
+  let added = 0;
+  names.forEach(n => { if(n && !teachers.includes(n)){ teachers.push(n); added++; } });
+  renderTeachers(); await autoSave();
+  showToast(`${added}명 추가됨`);
+}
+
+function renderTeachers() {
+  const wrap = document.getElementById('teacher-tags');
+  if (wrap) wrap.innerHTML = teachers.map(t=>`<span class="teacher-tag">${t}<button class="rm" onclick="removeTeacher('${t.replace(/'/g,"\\'")}')">×</button></span>`).join('');
+  const lbl = document.getElementById('teacher-count-label');
+  if (lbl) lbl.innerHTML = `<b>${teachers.length}명</b> 입력됨`;
+  const badge = document.getElementById('teacher-badge');
+  if (badge) badge.textContent = teachers.length;
+  const need = cfg.grades*cfg.classes*cfg.perRoom + cfg.grades*cfg.hall + cfg.wait;
+  const al = document.getElementById('teacher-need-alert');
+  if (al) {
+    if (teachers.length < need) { al.classList.remove('hidden'); al.textContent = `⚠️ 교시당 ${need}명 필요, 현재 ${teachers.length}명 (${need-teachers.length}명 부족)`; }
+    else al.classList.add('hidden');
+  }
+}
+
+// ═══════════════════════════════════════
+//  제약 조건
+// ═══════════════════════════════════════
+function applyConstraintsToUI() {
+  const con = cfg.constraints || defaultConstraints();
+  const el = document.getElementById('dup-' + (con.dupMode||'none'));
+  if (el) el.checked = true;
+  const maxEl = document.getElementById('max-duties');
+  if (maxEl) maxEl.value = con.maxDuties || 2;
+  const hrEl = document.getElementById('no-homeroom');
+  if (hrEl) hrEl.checked = !!con.noHomeroom;
+  toggleHomeroomTable();
+  renderExcludeList();
+}
+
+async function saveCfgConstraints() {
+  if (!cfg.constraints) cfg.constraints = defaultConstraints();
+  const checked = document.querySelector('input[name="dupMode"]:checked');
+  if (checked) cfg.constraints.dupMode = checked.value;
+  const maxEl = document.getElementById('max-duties');
+  if (maxEl) cfg.constraints.maxDuties = parseInt(maxEl.value)||2;
+  const hrEl = document.getElementById('no-homeroom');
+  if (hrEl) cfg.constraints.noHomeroom = hrEl.checked;
+  teachers.forEach(t => { const el = document.getElementById('hr-'+t); if(el) cfg.constraints.homeroom[t]=el.value; });
+  await autoSave();
+}
+
+function resetConstraints() {
+  if (!confirm('제약 조건을 초기화하겠습니까?')) return;
+  cfg.constraints = defaultConstraints();
+  applyConstraintsToUI(); autoSave();
+}
+
+function toggleHomeroomTable() {
+  const el = document.getElementById('no-homeroom');
+  const wrap = document.getElementById('homeroom-table');
+  if (wrap) wrap.style.display = (el&&el.checked)?'block':'none';
+}
+
+function renderHomeroomList() {
+  const wrap = document.getElementById('homeroom-list');
+  if (!wrap) return;
+  if (!teachers.length) { wrap.innerHTML='<span style="font-size:12px;color:var(--text3)">감독 명단을 먼저 입력하세요.</span>'; return; }
+  const homeroom = cfg.constraints?.homeroom || {};
+  let html = '';
+  teachers.forEach(t => {
+    const val = homeroom[t]||'';
+    let opts = '<option value="">담임 아님</option>';
+    for (let g=1;g<=cfg.grades;g++) for(let c=1;c<=cfg.classes;c++){const k=`${g}-${c}`;opts+=`<option value="${k}"${val===k?' selected':''}>${g}-${c}반</option>`;}
+    html += `<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;min-width:70px;font-weight:600">${t}</span><select id="hr-${t}" style="font-size:12px;flex:1" onchange="saveCfgConstraints()">${opts}</select></div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+function renderExcludeList() {
+  const wrap = document.getElementById('exclude-list');
+  if (!wrap) return;
+  const excludes = cfg.constraints?.excludes || [];
+  if (!excludes.length) { wrap.innerHTML='<span style="font-size:12px;color:var(--text3)">제외 조건 없음</span>'; return; }
+  let html='';
+  excludes.forEach((ex,i) => {
+    const tOpts = `<option value="">선생님</option>${teachers.map(t=>`<option value="${t}"${ex.teacher===t?' selected':''}>${t}</option>`).join('')}`;
+    const pOpts = `<option value="">교시</option>${Array.from({length:cfg.periods},(_,pi)=>`<option value="${pi+1}"${ex.period==pi+1?' selected':''}>${pi+1}교시</option>`).join('')}`;
+    html+=`<div style="display:flex;align-items:center;gap:8px;background:var(--surface);padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border-light);">
+      <select style="font-size:12px" onchange="updateExclude(${i},'teacher',this.value)">${tOpts}</select>
+      <span style="font-size:12px;color:var(--text2)">→</span>
+      <select style="font-size:12px" onchange="updateExclude(${i},'period',this.value)">${pOpts}</select>
+      <span style="font-size:12px;color:var(--text2)">감독 제외</span>
+      <button class="btn btn-danger btn-sm" onclick="removeExclude(${i})" style="margin-left:auto">✕</button>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+function addExcludeRow() {
+  if (!cfg.constraints) cfg.constraints = defaultConstraints();
+  cfg.constraints.excludes.push({teacher:'',period:''});
+  renderExcludeList();
+}
+
+function updateExclude(i,field,val) {
+  if (!cfg.constraints?.excludes[i]) return;
+  cfg.constraints.excludes[i][field] = field==='period' ? parseInt(val)||'' : val;
+  autoSave();
+}
+
+function removeExclude(i) {
+  cfg.constraints.excludes.splice(i,1);
+  renderExcludeList(); autoSave();
+}
+
+function checkConstraintViolations() {
+  const con = cfg.constraints||{};
+  const violations = [];
+  const dutyCounts = {};
+  for (let p=1;p<=cfg.periods;p++) {
+    for (let g=1;g<=cfg.grades;g++) {
+      for (let c=1;c<=cfg.classes;c++) (assignments[p]?.rooms[`${g}-${c}`]||[]).forEach(n=>{if(n)dutyCounts[n]=(dutyCounts[n]||0)+1;});
+      (assignments[p]?.hall[g]||[]).forEach(n=>{if(n)dutyCounts[n]=(dutyCounts[n]||0)+1;});
+    }
+    (assignments[p]?.wait||[]).forEach(n=>{if(n)dutyCounts[n]=(dutyCounts[n]||0)+1;});
+  }
+  if (con.dupMode==='nodup') Object.entries(dutyCounts).forEach(([t,cnt])=>{if(cnt>1)violations.push(`[교시중복] ${t} (${cnt}회 배치)`);});
+  else if (con.dupMode==='max') { const max=con.maxDuties||2; Object.entries(dutyCounts).forEach(([t,cnt])=>{if(cnt>max)violations.push(`[최대횟수초과] ${t} (${cnt}회, 최대 ${max}회)`);});}
+  (con.excludes||[]).forEach(ex => {
+    if (!ex.teacher||!ex.period) return;
+    const p=ex.period; let found=false;
+    for(let g=1;g<=cfg.grades&&!found;g++){for(let c=1;c<=cfg.classes&&!found;c++){if((assignments[p]?.rooms[`${g}-${c}`]||[]).includes(ex.teacher))found=true;} if((assignments[p]?.hall[g]||[]).includes(ex.teacher))found=true;}
+    if((assignments[p]?.wait||[]).includes(ex.teacher))found=true;
+    if(found)violations.push(`[제외조건위반] ${ex.teacher} — ${ex.period}교시 배치됨`);
+  });
+  if (con.noHomeroom) Object.entries(con.homeroom||{}).forEach(([t,key])=>{if(!key)return;for(let p=1;p<=cfg.periods;p++){if((assignments[p]?.rooms[key]||[]).includes(t))violations.push(`[담임자기반] ${t} — ${p}교시 ${key}반 배치됨`);}});
+  return violations;
+}
+
+// ═══════════════════════════════════════
+//  교시별 배치 화면
+// ═══════════════════════════════════════
+function getRoleNames() {
+  if (cfg.perRoom===1) return ['감독'];
+  if (cfg.perRoom===2) return ['정감독','부감독'];
+  return Array.from({length:cfg.perRoom},(_,i)=>i===0?'정감독':i===1?'부감독':`감독${i+1}`);
+}
+
+function teacherOpts(selected) {
+  let s = '<option value="">-- 선택 --</option>';
+  teachers.forEach(t => { s += `<option value="${t}"${t===selected?' selected':''}>${t}</option>`; });
+  return s;
+}
+
+function renderPeriodPage(p) {
+  const wrap = document.getElementById(`page-period${p}`);
+  if (!wrap) return;
+  if (!assignments[p]) initAssignments();
+  const roleNames = getRoleNames();
+  const timeStr = cfg.times[p-1] ? ` (${cfg.times[p-1]})` : '';
+  let html = `<div class="card"><div class="card-title">📝 ${p}교시${timeStr} 배치</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="autoAssignPeriod(${p})">🔀 자동 배치</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearPeriod(${p})">🗑️ 초기화</button>
+    </div>
+    <div id="dup-warn-${p}" class="alert alert-danger hidden"></div></div>`;
+
+  for (let g=1;g<=cfg.grades;g++) {
+    html += `<div class="card"><div class="grade-header">🏫 ${g}학년</div><div style="overflow-x:auto;"><table class="assign-table"><thead><tr><th>반</th><th style="min-width:90px">과목</th>`;
+    roleNames.forEach(r => html += `<th>${r}</th>`);
+    html += `</tr></thead><tbody>`;
+    for (let c=1;c<=cfg.classes;c++) {
+      const key=`${g}-${c}`;
+      const row = assignments[p].rooms[key]||Array(cfg.perRoom).fill('');
+      const subjVal = getSubject(p,key);
+      html += `<tr><td>${g}-${c}반</td><td><input type="text" value="${subjVal}" placeholder="과목" style="width:100%;font-size:12px;padding:4px 6px;" onchange="setSubject(${p},'${key}',this.value)" id="sinp-${p}-${key}"></td>`;
+      row.forEach((n,ri) => { html += `<td><select onchange="setRoom(${p},'${key}',${ri},this.value)">${teacherOpts(n)}</select></td>`; });
+      html += `</tr>`;
+    }
+    html += `</tbody></table></div>`;
+    if (cfg.hall>0) {
+      html += `<div class="hall-wait-row">`;
+      for (let h=0;h<cfg.hall;h++) {
+        const val=(assignments[p].hall[g]||[])[h]||'';
+        html += `<div class="hall-item"><label>🚶 복도${cfg.hall>1?` ${h+1}`:''}:</label><select onchange="setHall(${p},${g},${h},this.value)">${teacherOpts(val)}</select></div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  if (cfg.wait>0) {
+    html += `<div class="card"><div class="hall-wait-row">`;
+    for (let w=0;w<cfg.wait;w++) {
+      const val=(assignments[p].wait||[])[w]||'';
+      html += `<div class="hall-item"><label>🚪 대기실${cfg.wait>1?` ${w+1}`:''}:</label><select onchange="setWait(${p},${w},this.value)">${teacherOpts(val)}</select></div>`;
+    }
+    html += `</div></div>`;
+  }
+  wrap.innerHTML = html;
+  checkDup(p);
+}
+
+function checkDup(p) {
+  const counts={};
+  const add=v=>{if(v)counts[v]=(counts[v]||0)+1;};
+  for(let g=1;g<=cfg.grades;g++){for(let c=1;c<=cfg.classes;c++)(assignments[p].rooms[`${g}-${c}`]||[]).forEach(add);(assignments[p].hall[g]||[]).forEach(add);}
+  (assignments[p].wait||[]).forEach(add);
+  const dups=Object.entries(counts).filter(([k,v])=>v>1).map(([k])=>k);
+  const el=document.getElementById(`dup-warn-${p}`);
+  if(el){if(dups.length){el.classList.remove('hidden');el.innerHTML=`⚠️ 이 교시 중복 배치: <b>${dups.join(', ')}</b>`;}else el.classList.add('hidden');}
+}
+
+async function setRoom(p,key,idx,val){if(!assignments[p])initAssignments();if(!assignments[p].rooms[key])assignments[p].rooms[key]=Array(cfg.perRoom).fill('');assignments[p].rooms[key][idx]=val;checkDup(p);await autoSave();}
+async function setHall(p,g,idx,val){if(!assignments[p].hall[g])assignments[p].hall[g]=Array(cfg.hall).fill('');assignments[p].hall[g][idx]=val;checkDup(p);await autoSave();}
+async function setWait(p,idx,val){if(!assignments[p].wait)assignments[p].wait=Array(cfg.wait).fill('');assignments[p].wait[idx]=val;checkDup(p);await autoSave();}
+
+async function setSubject(p,key,val){
+  if(!cfg.subjects)cfg.subjects={};
+  const mode=cfg.subjectMode||'period';
+  if(mode==='period'){
+    cfg.subjects[p]=val;
+    for(let g=1;g<=cfg.grades;g++)for(let c=1;c<=cfg.classes;c++){const el=document.getElementById(`sinp-${p}-${g}-${c}`);if(el&&`${g}-${c}`!==key)el.value=val;}
+  } else {
+    if(!cfg.subjects[p]||typeof cfg.subjects[p]!=='object')cfg.subjects[p]={};
+    cfg.subjects[p][key]=val;
+  }
+  await autoSave();
+}
+
+async function autoAssignPeriod(p) {
+  if(!teachers.length){alert('감독 명단을 먼저 입력하세요.');return;}
+  const con=cfg.constraints||{};
+  const excludedThisPeriod=new Set((con.excludes||[]).filter(e=>e.teacher&&e.period==p).map(e=>e.teacher));
+  const homeroom=con.noHomeroom?(con.homeroom||{}):{};
+  const dutyCount={};
+  teachers.forEach(t=>dutyCount[t]=0);
+  for(let pp=1;pp<=cfg.periods;pp++){
+    if(pp===p)continue;
+    for(let g=1;g<=cfg.grades;g++){for(let c=1;c<=cfg.classes;c++)(assignments[pp]?.rooms[`${g}-${c}`]||[]).forEach(n=>{if(n&&dutyCount[n]!==undefined)dutyCount[n]++;});(assignments[pp]?.hall[g]||[]).forEach(n=>{if(n&&dutyCount[n]!==undefined)dutyCount[n]++;});}
+    (assignments[pp]?.wait||[]).forEach(n=>{if(n&&dutyCount[n]!==undefined)dutyCount[n]++;});
+  }
+  let pool=teachers.filter(t=>{
+    if(excludedThisPeriod.has(t))return false;
+    if(con.dupMode==='nodup'&&dutyCount[t]>=1)return false;
+    if(con.dupMode==='max'&&dutyCount[t]>=(con.maxDuties||2))return false;
+    return true;
+  });
+  const totalSlots=cfg.grades*cfg.classes*cfg.perRoom+cfg.grades*cfg.hall+cfg.wait;
+  if(pool.length<totalSlots){
+    const msg=pool.length===0?'⚠️ 제약 조건을 만족하는 선생님이 없습니다. 제약을 완화하거나 명단을 늘려주세요.':`⚠️ 제약 후 가용 인원 ${pool.length}명, 필요 ${totalSlots}명. 일부 중복이 발생합니다. 계속할까요?`;
+    if(pool.length===0){alert(msg);return;}
+    if(!confirm(msg))return;
+    while(pool.length<totalSlots)pool=[...pool,...teachers.filter(t=>!excludedThisPeriod.has(t))];
+  }
+  const shuffled=[...pool].sort(()=>Math.random()-.5);
+  let idx=0;
+  const pickForRoom=(grade,cls)=>{
+    const key=`${grade}-${cls}`;
+    const forbidden=con.noHomeroom?Object.entries(homeroom).filter(([t,k])=>k===key).map(([t])=>t):[];
+    for(let i=idx;i<shuffled.length;i++){if(!forbidden.includes(shuffled[i])){const t=shuffled[i];shuffled.splice(i,1);return t;}}
+    return shuffled[idx++]||'';
+  };
+  const pickGeneral=()=>shuffled[idx++]||'';
+  for(let g=1;g<=cfg.grades;g++){for(let c=1;c<=cfg.classes;c++)assignments[p].rooms[`${g}-${c}`]=Array.from({length:cfg.perRoom},()=>pickForRoom(g,c));assignments[p].hall[g]=Array.from({length:cfg.hall},pickGeneral);}
+  assignments[p].wait=Array.from({length:cfg.wait},pickGeneral);
+  renderPeriodPage(p); await autoSave();
+}
+
+async function clearPeriod(p) {
+  if(!confirm(`${p}교시 배치를 초기화하겠습니까?`))return;
+  assignments[p]={rooms:{},hall:{},wait:[]};
+  for(let g=1;g<=cfg.grades;g++){assignments[p].hall[g]=Array(cfg.hall).fill('');for(let c=1;c<=cfg.classes;c++)assignments[p].rooms[`${g}-${c}`]=Array(cfg.perRoom).fill('');}
+  assignments[p].wait=Array(cfg.wait).fill('');
+  renderPeriodPage(p); await autoSave();
+}
+
+// ═══════════════════════════════════════
+//  결과 배치표
+// ═══════════════════════════════════════
+function renderResult() {
+  const roleNames=getRoleNames();
+  const cont=document.getElementById('result-content');
+  if(!cont)return;
+  const allDups={};
+  for(let p=1;p<=cfg.periods;p++){
+    const counts={};const add=v=>{if(v)counts[v]=(counts[v]||0)+1;};
+    for(let g=1;g<=cfg.grades;g++){for(let c=1;c<=cfg.classes;c++)(assignments[p]?.rooms[`${g}-${c}`]||[]).forEach(add);(assignments[p]?.hall[g]||[]).forEach(add);}
+    (assignments[p]?.wait||[]).forEach(add);
+    const dups=Object.keys(counts).filter(k=>counts[k]>1);if(dups.length)allDups[p]=dups;
+  }
+  const dupEl=document.getElementById('dup-alerts');
+  if(dupEl){
+    let dh='';
+    Object.entries(allDups).forEach(([p,dups])=>{ dh+=`<div class="alert alert-danger">⚠️ ${p}교시 교시내 중복: ${dups.join(', ')}</div>`; });
+    const violations=checkConstraintViolations();
+    if(violations.length)dh+=`<div class="alert alert-warning">🔒 제약 위반 (${violations.length}건):<br>${violations.map(v=>`• ${v}`).join('<br>')}</div>`;
+    dupEl.innerHTML=dh||'<div class="alert alert-success">✅ 중복 없음, 제약 조건 모두 만족</div>';
+  }
+  let html=`<div style="text-align:center;margin-bottom:16px;"><div style="font-size:20px;font-weight:800">${cfg.school}</div><div style="font-size:14px;color:var(--text2);margin-top:4px">${cfg.exam}${cfg.date?' | '+cfg.date:''} 감독 배치표</div></div>`;
+  for(let p=1;p<=cfg.periods;p++){
+    const timeStr=cfg.times[p-1]?` (${cfg.times[p-1]})`:'';
+    html+=`<div class="card" style="margin-bottom:20px;"><div class="card-title" style="font-size:16px">📝 ${p}교시${timeStr}</div>`;
+    if(cfg.wait>0){const wn=(assignments[p]?.wait||[]).map(n=>n||'-');html+=`<div class="hall-wait-row" style="margin-bottom:12px"><label style="font-weight:800">🚪 대기실:</label>${wn.map(n=>`<span class="badge badge-wait">${n}</span>`).join('')}</div>`;}
+    html+=`<div class="result-wrapper"><table class="result-table"><thead><tr><th>학년</th><th>학급</th><th>과목</th>`;
+    roleNames.forEach(r=>html+=`<th>${r}</th>`);
+    if(cfg.hall>0)for(let h=0;h<cfg.hall;h++)html+=`<th>복도${cfg.hall>1?` ${h+1}`:''}</th>`;
+    html+=`</tr></thead><tbody>`;
+    for(let g=1;g<=cfg.grades;g++){
+      const hallNames=(assignments[p]?.hall[g]||[]);
+      for(let c=1;c<=cfg.classes;c++){
+        const key=`${g}-${c}`;const row=assignments[p]?.rooms[key]||[];
+        const subj=getSubject(p,key);
+        html+=`<tr>`;
+        if(c===1)html+=`<td rowspan="${cfg.classes}" style="font-weight:800">${g}학년</td>`;
+        html+=`<td style="font-weight:700">${g}-${c}반</td><td style="font-size:12px;color:var(--text2)">${subj||''}</td>`;
+        row.forEach((n,ri)=>{const cls=ri===0?'badge-main':'badge-sub';html+=`<td><span class="badge ${n?cls:'badge-empty'}">${n||'-'}</span></td>`;});
+        if(cfg.hall>0&&c===1)hallNames.forEach(hn=>{html+=`<td rowspan="${cfg.classes}"><span class="badge ${hn?'badge-hall':'badge-empty'}">${hn||'-'}</span></td>`;});
+        html+=`</tr>`;
+      }
+    }
+    html+=`</tbody></table></div></div>`;
+  }
+  cont.innerHTML=html;
+}
+
+// ═══════════════════════════════════════
+//  담당 현황
+// ═══════════════════════════════════════
+function renderSummary() {
+  const cont=document.getElementById('summary-content');
+  if(!cont)return;
+  const map={};teachers.forEach(t=>map[t]=[]);
+  const roleNames=getRoleNames();
+  for(let p=1;p<=cfg.periods;p++){
+    for(let g=1;g<=cfg.grades;g++){
+      for(let c=1;c<=cfg.classes;c++){const k=`${g}-${c}`;(assignments[p]?.rooms[k]||[]).forEach((n,ri)=>{if(n){if(!map[n])map[n]=[];map[n].push(`${p}교시 ${g}-${c}반 ${roleNames[ri]||''}`);}});}
+      (assignments[p]?.hall[g]||[]).forEach((n,hi)=>{if(n){if(!map[n])map[n]=[];map[n].push(`${p}교시 ${g}학년 복도`);}});
+    }
+    (assignments[p]?.wait||[]).forEach((n,wi)=>{if(n){if(!map[n])map[n]=[];map[n].push(`${p}교시 대기실`);}});
+  }
+  let html=`<table class="result-table"><thead><tr><th>이름</th><th>담당</th><th>횟수</th></tr></thead><tbody>`;
+  Object.entries(map).sort((a,b)=>b[1].length-a[1].length).forEach(([name,duties])=>{
+    html+=`<tr><td style="font-weight:700">${name}</td><td style="text-align:left">${duties.length?duties.map(d=>`<span class="badge badge-main" style="margin:2px">${d}</span>`).join(' '):'<span style="color:var(--text3)">미배치</span>'}</td><td><b>${duties.length}</b>회</td></tr>`;
+  });
+  html+=`</tbody></table>`;
+  cont.innerHTML=html;
+}
+
+// ═══════════════════════════════════════
+//  백업 / 복원
+// ═══════════════════════════════════════
+function exportData() {
+  const data=JSON.stringify({cfg,teachers,assignments},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`감독배치_${cfg.school.replace(/\s/g,'')}_${Date.now()}.json`;
+  a.click();
+}
+
+function importData(){document.getElementById('import-file').click();}
+
+async function doImport(e) {
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(d.cfg){cfg={...cfg,...d.cfg};if(!cfg.constraints)cfg.constraints=defaultConstraints();applySettingsToUI();}
+      if(d.teachers)teachers=d.teachers;
+      if(d.assignments)assignments=d.assignments;
+      renderTeachers();updateNeedSummary();await autoSave();showToast('복원 완료');
+    }catch(err){alert('파일 형식이 올바르지 않습니다.');}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+function copyResultText(){
+  let text=`${cfg.school} ${cfg.exam} 감독 배치표\n\n`;
+  const roleNames=getRoleNames();
+  for(let p=1;p<=cfg.periods;p++){
+    const timeStr=cfg.times[p-1]?` (${cfg.times[p-1]})`:'';
+    text+=`=== ${p}교시${timeStr} ===\n`;
+    for(let g=1;g<=cfg.grades;g++){
+      text+=`[${g}학년]\n`;
+      for(let c=1;c<=cfg.classes;c++){const k=`${g}-${c}`;const row=assignments[p]?.rooms[k]||[];const subj=getSubject(p,k);const parts=row.map((n,ri)=>`${roleNames[ri]||''}:${n||'-'}`).join(' / ');text+=`  ${g}-${c}반 [${subj||'과목없음'}]: ${parts}\n`;}
+      const hall=(assignments[p]?.hall[g]||[]).join(', ')||'-';text+=`  ${g}학년 복도: ${hall}\n`;
+    }
+    const wait=(assignments[p]?.wait||[]).join(', ')||'-';text+=`  대기실: ${wait}\n\n`;
+  }
+  navigator.clipboard.writeText(text).then(()=>showToast('클립보드에 복사됨'));
+}
+
+// ═══════════════════════════════════════
+//  유틸
+// ═══════════════════════════════════════
+let toastTimer;
+function showToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.style.display='block';
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.style.display='none',2500);
+}
+</script>
+</body>
+</html>
